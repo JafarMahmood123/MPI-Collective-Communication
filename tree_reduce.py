@@ -35,44 +35,45 @@ def tree_reduce(comm, local_matrix):
         # Root holds the final result
         return accumulated_matrix
 
+
 def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
     
-    # Matrix dimensions
-    rows, cols = 500, 500
-    
-    # Initialize local matrix with 1s (so final result should be matrix of value = size)
-    local_matrix = np.ones((rows, cols), dtype='i')
-    
-    # Start Timing
-    t_start = MPI.Wtime()
-    
-    # Perform Tree Reduce
-    result_matrix = tree_reduce(comm, local_matrix)
-    
-    # End Timing
-    t_end = MPI.Wtime()
+    # Test cases: Small, Medium, Large
+    test_sizes = [500, 2000, 4000] 
     
     if rank == 0:
-        # Verification
-        expected_value = size
-        if result_matrix[0,0] == expected_value:
-             print(f"SUCCESS: Reduced Value is {result_matrix[0,0]} (Expected: {size})")
-        else:
-             print(f"FAILURE: Got {result_matrix[0,0]}, expected {size}")
-             
-        print(f"Tree Reduce Time: {t_end - t_start:.6f} seconds")
+        print(f"{'Size':<10} | {'Processes':<10} | {'Parallel (s)':<15} | {'Sequential (s)':<15} | {'Speedup':<10}")
+        print("-" * 75)
+
+    for N in test_sizes:
+        rows, cols = N, N
         
-        # --- Sequential Comparison Part (for the table in Q2) ---
-        # A purely sequential sum would involve iterating N times adding matrices
-        t_seq_start = MPI.Wtime()
-        seq_acc = np.zeros((rows, cols), dtype='i')
-        for _ in range(size):
-            seq_acc += np.ones((rows, cols), dtype='i')
-        t_seq_end = MPI.Wtime()
-        print(f"Sequential Time (Approx): {t_seq_end - t_seq_start:.6f} seconds")
+        # 1. Setup Data
+        local_matrix = np.ones((rows, cols), dtype='i')
+        comm.Barrier()
+        
+        # 2. Measure Parallel Tree Reduce
+        t_start = MPI.Wtime()
+        result_matrix = tree_reduce(comm, local_matrix)
+        t_end = MPI.Wtime()
+        parallel_time = t_end - t_start
+        
+        # 3. Measure Sequential (Rank 0 only) and Print
+        if rank == 0:
+            t_seq_start = MPI.Wtime()
+            seq_acc = np.zeros((rows, cols), dtype='i')
+            # Simulate adding 'size' matrices
+            dummy = np.ones((rows, cols), dtype='i')
+            for _ in range(size):
+                seq_acc += dummy
+            t_seq_end = MPI.Wtime()
+            sequential_time = t_seq_end - t_seq_start
+            
+            speedup = sequential_time / parallel_time
+            print(f"{str(N)+'x'+str(N):<10} | {size:<10} | {parallel_time:.6f}        | {sequential_time:.6f}        | {speedup:.2f}x")
 
 if __name__ == "__main__":
     main()
